@@ -35,7 +35,16 @@ const apiLimiter = rateLimit({
 app.use(apiLimiter);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Authorization']
+}));
+
+app.options('*', cors()); // Enable pre-flight for all routes
+
 app.use(express.json());
 
 // API versioning
@@ -145,13 +154,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Remove API and version prefix from routes
-app.use('/users', userRoutes);
-app.use('/sessions', sessionRoutes);
-app.use('/accounts', accountRoutes);
-app.use('/transfers', transactionRoutes);
+// Apply API routes with version prefix
+app.use('/api/users', userRoutes);
+app.use('/api/sessions', sessionRoutes);
+app.use('/api/accounts', accountRoutes);
+app.use('/api/transfers', transactionRoutes);
 
-// Keep B2B endpoints without version for compatibility with central bank
+// B2B routes remain without /api prefix for compatibility
 app.use('/transfers', b2bRoutes);
 
 // JWKS endpoint (public)
