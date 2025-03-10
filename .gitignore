@@ -33,3 +33,7 @@ coverage/
 # Build files
 dist/
 build/
+
+
+nginx
+database.sqlite

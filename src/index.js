@@ -47,8 +47,13 @@ app.use(apiLimiter);
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-  credentials: true, // Enable credentials
+  origin: [
+    'http://localhost:5000',                  // Local development
+    'http://127.0.0.1:5000',                 // Local development alternative
+    'https://bank.eerovallistu.site',        // Production domain
+    'http://bank.eerovallistu.site'          // Production domain HTTP
+  ],
+  credentials: true,                         // Allow credentials (cookies, auth headers)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
