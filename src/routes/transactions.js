@@ -507,4 +507,80 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /transfers/history:
+ *   get:
+ *     summary: Get user's transaction history
+ *     tags: [Transactions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, inProgress, completed, failed]
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [incoming, outgoing, all]
+ *     responses:
+ *       200:
+ *         description: Transaction history
+ */
+router.get('/history', authenticate, async (req, res) => {
+  try {
+    const { status, type = 'all' } = req.query;
+
+    // Get user's accounts
+    const accounts = await Account.findAll({
+      where: { userId: req.user.id },
+      attributes: ['accountNumber']
+    });
+    
+    const accountNumbers = accounts.map(acc => acc.accountNumber);
+    
+    // Build query conditions
+    const where = {};
+    
+    if (status) {
+      where.status = status;
+    }
+    
+    if (type === 'incoming') {
+      where.toAccount = { [Op.in]: accountNumbers };
+    } else if (type === 'outgoing') {
+      where.fromAccount = { [Op.in]: accountNumbers };
+    } else {
+      where[Op.or] = [
+        { fromAccount: { [Op.in]: accountNumbers } },
+        { toAccount: { [Op.in]: accountNumbers } }
+      ];
+    }
+
+    const transactions = await Transaction.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      include: [{
+        model: Account,
+        as: 'sourceAccount',
+        attributes: ['name']
+      }]
+    });
+
+    res.json({
+      status: 'success',
+      data: transactions
+    });
+  } catch (error) {
+    console.error('Error fetching transaction history:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch transaction history'
+    });
+  }
+});
+
 module.exports = router;

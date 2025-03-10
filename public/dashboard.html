@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Bank API</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard">
+            <header>
+                <h2>Welcome to Dashboard</h2>
+                <nav class="nav-links">
+                    <a href="/transactions.html">Make Transfer</a>
+                    <button onclick="logout()" class="logout-btn">Logout</button>
+                </nav>
+            </header>
+            
+            <section class="accounts-section">
+                <div class="section-header">
+                    <h3>Your Accounts</h3>
+                    <button onclick="createAccount()" class="create-btn">New Account</button>
+                </div>
+                <div id="accountsList" class="accounts-grid"></div>
+            </section>
+        </div>
+    </div>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

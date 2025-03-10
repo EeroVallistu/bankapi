@@ -1,27 +1,34 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
-// Get database path from environment or use default
-const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../database.sqlite');
-
-// Create Sequelize instance
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: dbPath,
-  logging: process.env.NODE_ENV === 'development' ? console.log : false
+  storage: path.join(__dirname, '../../', process.env.DATABASE_PATH || 'database.sqlite'),
+  logging: false,
+  pool: {
+    max: 1,        // Minimum connections
+    min: 0,
+    acquire: 3000, // Faster timeout
+    idle: 1000     // Faster idle
+  },
+  dialectOptions: {
+    timeout: 1000, // Faster timeout
+  },
+  define: {
+    timestamps: true,
+    underscored: true
+  }
 });
 
-// Test connection function
-async function testConnection() {
+// Super quick connection test
+const testConnection = async () => {
   try {
-    await sequelize.authenticate();
-    console.log('Database connection has been established successfully.');
-    return true;
+    await sequelize.authenticate({ timeout: 1000 });
   } catch (error) {
-    console.error('Unable to connect to the database:', error);
-    return false;
+    console.error('Database connection failed:', error);
+    throw error;
   }
-}
+};
 
 module.exports = {
   sequelize,

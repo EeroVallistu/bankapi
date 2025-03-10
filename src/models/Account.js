@@ -1,61 +1,70 @@
-const { DataTypes, Model } = require('sequelize');
+const { DataTypes } = require('sequelize');
 const { sequelize } = require('./db');
-const { v4: uuidv4 } = require('uuid');
 
-class Account extends Model {
-  // Static method to generate account number
-  static generateAccountNumber() {
-    const bankPrefix = process.env.BANK_PREFIX;
-    const uniqueId = uuidv4().replace(/-/g, '');
-    return `${bankPrefix}${uniqueId}`;
-  }
-}
-
-Account.init({
+const Account = sequelize.define('Account', {
   id: {
     type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true
+    primaryKey: true,
+    autoIncrement: true
   },
   accountNumber: {
     type: DataTypes.STRING,
+    unique: {
+      msg: 'Account number must be unique'
+    },
     allowNull: false,
-    unique: true
-  },
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'users',
-      key: 'id'
+    validate: {
+      startsWith(value) {
+        if (!value.startsWith(process.env.BANK_PREFIX)) {
+          throw new Error('Account number must start with correct bank prefix');
+        }
+      }
     }
   },
   balance: {
-    type: DataTypes.FLOAT,
+    type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
+    allowNull: false,
+    get() {
+      const value = this.getDataValue('balance');
+      return value === null ? null : parseFloat(value);
+    },
     validate: {
       min: 0
     }
   },
   currency: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(3),
+    defaultValue: 'EUR',
     allowNull: false,
     validate: {
       isIn: [['EUR', 'USD', 'GBP']]
     }
   },
-  name: {
-    type: DataTypes.STRING,
+  userId: {
+    type: DataTypes.INTEGER,
     allowNull: false
   },
-  createdAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'Main Account'
   }
 }, {
-  sequelize,
-  modelName: 'account',
-  timestamps: true
+  tableName: 'Accounts',
+  timestamps: true,
+  hooks: {
+    beforeUpdate: async (account) => {
+      if (account.changed('balance') && account.balance < 0) {
+        throw new Error('Account balance cannot be negative');
+      }
+    }
+  }
 });
+
+Account.generateAccountNumber = () => {
+  const prefix = process.env.BANK_PREFIX || '353';
+  return `${prefix}${Date.now()}${Math.random().toString(36).substr(2, 6)}`;
+};
 
 module.exports = Account;

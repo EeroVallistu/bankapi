@@ -89,54 +89,31 @@ router.get('/', [
   query('sort').optional().isString().withMessage('Invalid sort parameter')
 ], async (req, res) => {
   try {
-    // Validate query parameters
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        status: 'error',
-        errors: errors.array()
-      });
+    if (!req.user?.id) {
+      throw new Error('User ID not found in request');
     }
 
-    // Build query options
-    const where = { userId: req.user.id };
-    const order = [];
-    
-    // Apply currency filter if provided
-    if (req.query.currency) {
-      where.currency = req.query.currency;
-    }
-    
-    // Apply sorting if provided
-    if (req.query.sort) {
-      const sortField = req.query.sort.startsWith('-') 
-        ? req.query.sort.substring(1)
-        : req.query.sort;
-      
-      const sortDirection = req.query.sort.startsWith('-') ? 'DESC' : 'ASC';
-      
-      if (['balance', 'name', 'createdAt'].includes(sortField)) {
-        order.push([sortField, sortDirection]);
-      }
-    } else {
-      // Default sorting
-      order.push(['createdAt', 'DESC']);
-    }
+    console.log('GET /accounts - User:', req.user.id);
     
     const accounts = await Account.findAll({
-      where,
-      order
+      where: { userId: req.user.id },
+      order: [['createdAt', 'DESC']],
+      raw: true
     });
+    
+    // Debug logging
+    console.log('Found accounts:', JSON.stringify(accounts, null, 2));
     
     res.status(200).json({
       status: 'success',
-      data: accounts
+      data: accounts || []
     });
   } catch (error) {
-    console.error('Error fetching accounts:', error);
+    console.error('Error in GET /accounts:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error fetching accounts'
+      message: 'Failed to fetch accounts',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -249,6 +226,7 @@ router.post(
       .withMessage('Account name is required')
       .isLength({ min: 2, max: 50 })
       .withMessage('Account name must be between 2 and 50 characters')
+      .trim()
   ],
   async (req, res) => {
     try {
@@ -257,6 +235,7 @@ router.post(
       if (!errors.isEmpty()) {
         return res.status(400).json({ 
           status: 'error', 
+          message: errors.array()[0].msg,
           errors: errors.array() 
         });
       }
@@ -266,24 +245,25 @@ router.post(
       // Generate account number
       const accountNumber = Account.generateAccountNumber();
       
-      // Create new account
+      // Create new account with explicit fields
       const account = await Account.create({
         accountNumber,
         userId: req.user.id,
-        currency,
-        name,
+        currency: currency.toUpperCase(),
+        name: name.trim(),
         balance: 1000 // Starting balance for demonstration
       });
       
       res.status(201).json({
         status: 'success',
-        data: account
+        data: account,
+        message: 'Account created successfully'
       });
     } catch (error) {
       console.error('Error creating account:', error);
       res.status(500).json({
         status: 'error',
-        message: 'Error creating account'
+        message: 'Error creating account: ' + error.message
       });
     }
   }

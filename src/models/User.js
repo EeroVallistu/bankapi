@@ -1,29 +1,34 @@
-const { DataTypes, Model } = require('sequelize');
+const { DataTypes } = require('sequelize');
 const { sequelize } = require('./db');
 
-class User extends Model {
-  async comparePassword(candidatePassword) {
-    return this.password === candidatePassword;
-  }
-}
-
-User.init({
+const User = sequelize.define('User', {
   id: {
     type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true
+    primaryKey: true,
+    autoIncrement: true
   },
   username: {
     type: DataTypes.STRING,
+    unique: {
+      msg: 'This username is already taken'
+    },
     allowNull: false,
-    unique: true,
     validate: {
-      notEmpty: true
+      len: {
+        args: [3, 30],
+        msg: 'Username must be between 3 and 30 characters'
+      }
     }
   },
   password: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: false,
+    validate: {
+      len: {
+        args: [6, 100],
+        msg: 'Password must be at least 6 characters long'
+      }
+    }
   },
   fullName: {
     type: DataTypes.STRING,
@@ -31,24 +36,20 @@ User.init({
   },
   email: {
     type: DataTypes.STRING,
-    allowNull: false,
     unique: true,
-    validate: {
-      isEmail: true
-    }
+    allowNull: false
   },
   sessions: {
     type: DataTypes.JSON,
     defaultValue: []
-  },
-  createdAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
   }
-}, {
-  sequelize,
-  modelName: 'user',
-  timestamps: true
 });
+
+User.prototype.toJSON = function() {
+  const values = { ...this.get() };
+  delete values.password;
+  delete values.sessions;
+  return values;
+};
 
 module.exports = User;

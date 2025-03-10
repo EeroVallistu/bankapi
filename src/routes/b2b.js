@@ -6,6 +6,7 @@ const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const keyManager = require('../utils/keyManager');
 const centralBankService = require('../services/centralBankService');
+const cache = require('../middleware/cache');
 
 /**
  * @swagger
@@ -45,164 +46,58 @@ const centralBankService = require('../services/centralBankService');
  *         description: Processing error
  */
 router.post('/incoming', async (req, res) => {
+  let transaction = null;
   try {
-    const { jwt: jwtToken } = req.body;
-    
-    if (!jwtToken) {
+    const { jwt: token } = req.body;
+    if (!token) {
       return res.status(400).json({ 
         status: 'error', 
-        message: 'JWT is required' 
+        message: 'JWT token required',
+        code: 'MISSING_TOKEN'
       });
     }
 
-    // Decode JWT without verification to extract claims
-    const decodedToken = jwt.decode(jwtToken, { complete: true });
-    if (!decodedToken) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid JWT format'
-      });
-    }
-
-    // Extract payload
-    const { 
-      accountFrom, 
-      accountTo, 
-      currency, 
-      amount, 
-      explanation, 
-      senderName 
-    } = decodedToken.payload;
-
-    // Check if destination account exists
-    const destinationAccount = await Account.findOne({
-      where: { accountNumber: accountTo }
-    });
+    // Decode and validate JWT structure
+    const decoded = await this.validateJWTStructure(token);
     
-    if (!destinationAccount) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Destination account not found'
-      });
-    }
-
-    // Extract bank prefix from source account
-    const bankPrefix = accountFrom.substring(0, 3);
-
-    try {
-      // Get the source bank details
-      const bankDetails = await centralBankService.getBankDetails(bankPrefix);
-      if (!bankDetails) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Source bank not recognized'
-        });
-      }
-
-      // Get the source bank's public key
-      const jwks = await centralBankService.getPublicKey(bankDetails.jwksUrl);
-      if (!jwks) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Unable to fetch source bank public key'
-        });
-      }
-
-      // Verify JWT signature
-      try {
-        // Create public key in PEM format from JWK
-        const publicKey = {
-          key: Buffer.from(jwks.n, 'base64url').toString('base64'),
-          format: 'jwk'
-        };
-
-        // Verify JWT
-        jwt.verify(jwtToken, publicKey, {
-          algorithms: ['RS256']
-        });
-      } catch (verifyError) {
-        console.error('JWT verification error:', verifyError);
-        return res.status(400).json({
-          status: 'error',
-          message: 'Invalid JWT signature'
-        });
-      }
-
-      // Get destination account owner for receiver name
-      const destinationUser = await User.findByPk(destinationAccount.userId);
-      if (!destinationUser) {
-        return res.status(500).json({
-          status: 'error',
-          message: 'Error finding account owner'
-        });
-      }
-
-      // Create transaction record
-      const transaction = await Transaction.create({
-        fromAccount: accountFrom,
-        toAccount: accountTo,
-        amount,
-        currency,
-        explanation,
-        senderName,
-        receiverName: destinationUser.fullName,
-        bankPrefix,
-        isExternal: true,
-        status: 'inProgress'
-      });
-
-      // Credit destination account
-      await destinationAccount.update({
-        balance: destinationAccount.balance + amount
-      });
-
-      // Update transaction status
-      await transaction.update({ status: 'completed' });
-
-      // Return response with receiver name
-      return res.status(200).json({
-        receiverName: destinationUser.fullName
-      });
-    } catch (error) {
-      console.error('B2B transaction processing error:', error);
-      return res.status(500).json({
-        status: 'error',
-        message: `Error processing transaction: ${error.message}`
-      });
-    }
-  } catch (error) {
-    console.error('B2B endpoint error:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Error processing request'
+    // Validate sending bank and get its public key
+    const publicKey = await this.validateSenderBank(decoded);
+    
+    // Verify JWT signature
+    await this.verifyJWTSignature(token, publicKey);
+    
+    // Process the transaction
+    const result = await transactionService.processIncomingTransaction(decoded.payload);
+    
+    res.json({
+      status: 'success',
+      receiverName: result.receiverName,
+      transactionId: result.transaction.id
     });
+  } catch (error) {
+    await this.handleIncomingTransactionError(transaction, error);
+    
+    const errorResponse = {
+      status: 'error',
+      message: error.message,
+      code: error.code || 'UNKNOWN_ERROR'
+    };
+
+    res.status(error.status || 500).json(errorResponse);
   }
 });
 
-// Add JWKS endpoint
-/**
- * @swagger
- * /transactions/keys:
- *   get:
- *     summary: Get bank's JSON Web Key Set
- *     tags: [Bank-to-Bank]
- *     security: []
- *     responses:
- *       200:
- *         description: JWKS with bank's public keys
- *       500:
- *         description: Error retrieving keys
- */
-router.get('/keys', (req, res) => {
+// Add better JWKS endpoint with caching
+router.get('/jwks.json', cache('5 minutes'), (req, res) => {
   try {
-    const keyManager = require('../utils/keyManager');
-    keyManager.ensureKeysExist();
     const jwks = keyManager.getJwks();
-    res.status(200).json(jwks);
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json(jwks);
   } catch (error) {
     res.status(500).json({
       status: 'error',
-      message: 'Error retrieving JWKS'
+      message: 'Error retrieving JWKS',
+      code: 'JWKS_ERROR'
     });
   }
 });

@@ -37,9 +37,22 @@ Transaction.init({
   },
   status: {
     type: DataTypes.STRING,
+    allowNull: false,
     defaultValue: 'pending',
     validate: {
-      isIn: [['pending', 'inProgress', 'completed', 'failed']]
+      isIn: {
+        args: [['pending', 'inProgress', 'completed', 'failed']],
+        msg: 'Invalid transaction status'
+      }
+    }
+  },
+  statusHistory: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    field: 'status_history', // Explicitly specify the column name
+    get() {
+      const value = this.getDataValue('statusHistory');
+      return value || [];
     }
   },
   senderName: {
@@ -68,7 +81,9 @@ Transaction.init({
   }
 }, {
   sequelize,
-  modelName: 'transaction',
+  modelName: 'Transaction',
+  tableName: 'transactions',
+  underscored: true, // Use snake_case for column names
   timestamps: true,
   hooks: {
     beforeUpdate: (transaction) => {

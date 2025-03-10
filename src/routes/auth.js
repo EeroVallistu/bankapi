@@ -80,7 +80,6 @@ userRouter.post(
   ],
   async (req, res) => {
     try {
-      // Validate input
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ status: 'error', errors: errors.array() });
@@ -88,7 +87,6 @@ userRouter.post(
 
       const { username, password, fullName, email } = req.body;
 
-      // Check if user already exists
       const existingUser = await User.findOne({ 
         where: {
           [Op.or]: [
@@ -105,10 +103,10 @@ userRouter.post(
         });
       }
 
-      // Create new user
+      // Store password as plain text (only for development!)
       await User.create({
         username,
-        password,
+        password, // WARNING: Storing plain text password (not secure!)
         fullName,
         email,
         sessions: []
@@ -255,12 +253,8 @@ userRouter.get('/me', authenticate, async (req, res) => {
 sessionRouter.post(
   '/',
   [
-    body('username')
-      .notEmpty()
-      .withMessage('Username is required'),
-    body('password')
-      .notEmpty()
-      .withMessage('Password is required')
+    body('username').notEmpty().trim().withMessage('Username is required'),
+    body('password').notEmpty().withMessage('Password is required')
   ],
   async (req, res) => {
     try {
@@ -274,7 +268,6 @@ sessionRouter.post(
 
       const { username, password } = req.body;
 
-      // Find user
       const user = await User.findOne({ where: { username } });
       if (!user) {
         return res.status(401).json({
@@ -283,40 +276,40 @@ sessionRouter.post(
         });
       }
 
-      // Check password
-      const isMatch = await user.comparePassword(password);
-      if (!isMatch) {
+      // Simple password check (not secure!)
+      if (user.password !== password) {
         return res.status(401).json({
           status: 'error',
           message: 'Invalid credentials',
         });
       }
 
-      // Generate token
-      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-        expiresIn: '24h',
+      // Generate unique session ID
+      const sessionId = require('crypto').randomBytes(32).toString('hex');
+      
+      const token = jwt.sign({ 
+        userId: user.id,
+        sessionId
+      }, process.env.JWT_SECRET, {
+        expiresIn: '24h'
       });
 
-      // Add token to user's sessions
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 1); // 24 hours from now
-      
-      const sessions = [...user.sessions, {
+      // Store session with expiry
+      const sessions = user.sessions || [];
+      sessions.push({
+        id: sessionId,
         token,
-        expiresAt
-      }];
-      
-      await user.update({ sessions });
+        expiresAt: new Date(Date.now() + 24*60*60*1000)
+      });
 
-      res.status(200).json({
+      // Clean up expired sessions
+      const validSessions = sessions.filter(s => new Date(s.expiresAt) > new Date());
+      await user.update({ sessions: validSessions });
+
+      res.json({
         status: 'success',
-        message: 'Login successful',
         token,
-        user: {
-          id: user.id,
-          username: user.username,
-          fullName: user.fullName,
-        },
+        user: user.toJSON()
       });
     } catch (error) {
       console.error('Login error:', error);
@@ -363,6 +356,25 @@ sessionRouter.delete('/:token', authenticate, async (req, res) => {
     res.status(200).json({
       status: 'success',
       message: 'Logout successful',
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error during logout',
+    });
+  }
+});
+
+sessionRouter.delete('/logout', authenticate, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    const sessions = (user.sessions || []).filter(s => s.token !== req.token);
+    await user.update({ sessions });
+    
+    res.json({
+      status: 'success',
+      message: 'Successfully logged out'
     });
   } catch (error) {
     console.error('Logout error:', error);

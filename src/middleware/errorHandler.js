@@ -45,6 +45,32 @@ const errorHandler = (err, req, res, next) => {
       }))
     });
   }
+
+  // Add specific error handlers
+  if (err instanceof jwt.JsonWebTokenError) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Invalid token',
+      code: 'INVALID_TOKEN'
+    });
+  }
+
+  if (err instanceof jwt.TokenExpiredError) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Token expired',
+      code: 'TOKEN_EXPIRED'
+    });
+  }
+
+  if (err.name === 'ExternalServiceError') {
+    return res.status(502).json({
+      status: 'error',
+      message: 'External service unavailable',
+      code: 'EXTERNAL_SERVICE_ERROR',
+      retryAfter: err.retryAfter || 60
+    });
+  }
   
   // Default error response
   res.status(statusCode).json(errorResponse);
