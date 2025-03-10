@@ -1,0 +1,15 @@
+[Unit]
+Description=Bank API Service
+After=network.target
+
+[Service]
+Type=simple
+User=bankapi
+WorkingDirectory=/opt/bankapi
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+[Install]
+WantedBy=multi-user.target

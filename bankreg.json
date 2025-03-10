@@ -1,0 +1,9 @@
+{
+    "id": 76,
+    "name": "Eero Bank",
+    "transactionUrl": "http://bank.eerovallistu.site/transactions/b2b",
+    "apiKey": "f2f003ea-43ec-4bb0-a114-8a53d28cd9d1",
+    "bankPrefix": "353",
+    "owners": "Eero",
+    "jwksUrl": "http://bank.eerovallistu.site/jwks.json"
+  }
