@@ -4,11 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bank API</title>
-    <script>
-        window.location.href = '/login.html';
-    </script>
+    <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-    <p>Redirecting to login page...</p>
+    <div class="container">
+        <header>
+            <h1>Welcome to Bank API</h1>
+        </header>
+        
+        <main>
+            <section class="hero">
+                <h2>Interoperable Banking System</h2>
+                <p>A secure and reliable API for banking operations</p>
+                <div class="buttons">
+                    <a href="/login.html" class="btn primary">Login</a>
+                    <a href="/register.html" class="btn secondary">Register</a>
+                    <a href="/docs" class="btn accent" id="docs-button">API Documentation</a>
+                </div>
+            </section>
+            
+            <section class="features">
+                <h2>Features</h2>
+                <div class="feature-cards">
+                    <div class="card">
+                        <h3>Account Management</h3>
+                        <p>Create and manage multiple accounts with different currencies</p>
+                    </div>
+                    <div class="card">
+                        <h3>Transfers</h3>
+                        <p>Transfer money between accounts within and across banks</p>
+                    </div>
+                    <div class="card">
+                        <h3>Interoperability</h3>
+                        <p>Connect with other banks using standard protocols</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>&copy; 2023 Bank API. All rights reserved.</p>
+            <nav>
+                <a href="/docs">API Documentation</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Privacy Policy</a>
+            </nav>
+        </footer>
+    </div>
+    
+    <script src="/js/swagger-redirect.js"></script>
 </body>
 </html>
